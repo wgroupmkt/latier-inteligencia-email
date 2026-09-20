@@ -1,0 +1,18 @@
+{
+  "name": "lantier-email-automation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Automatización de recepción y respuesta de postulaciones/CV para Lantier",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test:imap": "node src/email-reader.js",
+    "scan": "node src/scanner.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "imapflow": "^1.0.181",
+    "mailparser": "^3.7.2",
+    "nodemailer": "^6.10.0"
+  }
+}
