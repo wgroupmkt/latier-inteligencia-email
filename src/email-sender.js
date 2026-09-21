@@ -13,15 +13,26 @@ function createTransporter() {
   });
 }
 
-async function sendCvConfirmation({ to, name = 'Hola', position = '' }) {
+async function sendCvConfirmation({ to }) {
   const transporter = createTransporter();
-  const positionText = position ? ` para ${position}` : '';
 
   return transporter.sendMail({
     from: `Capital Humano Lantier <${process.env.EMAIL_USER}>`,
     to,
-    subject: 'Recibimos tu postulación',
-    text: `${name},\n\nGracias por enviarnos tu CV. Hemos recibido correctamente tu postulación${positionText}. Nuestro equipo de Capital Humano revisará tu perfil y, en caso de avanzar en el proceso, nos pondremos en contacto con vos.\n\nSaludos,\nEquipo de Capital Humano\nLantier`,
+
+    subject: 'Hemos recibido tu CV - Lantier Business Group',
+
+    text: `¡Hola! 👋🏻
+
+Muchas gracias por enviarnos tu CV y por tu interés en sumarte a Lantier Business Group.
+
+Queremos contarte que hemos recibido tu postulación correctamente. Nuestro equipo de Capital Humano se encuentra revisando los perfiles, y nos pondremos en contacto con vos en caso de que tu experiencia y perfil se ajusten a la búsqueda actual.
+
+¡Te deseamos mucho éxito! 🍀
+
+Saludos cordiales,
+Equipo de Capital Humano
+Lantier Business Group`,
   });
 }
 
