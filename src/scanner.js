@@ -2,9 +2,8 @@ require('dotenv').config();
 
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
+const { put } = require('@vercel/blob');
 
 const { isCvEmail } = require('./cv-detector');
 const { sendCvConfirmation } = require('./email-sender');
@@ -14,65 +13,54 @@ const {
   markAsProcessed
 } = require('./processed-store');
 
-function saveCvAttachment(attachments, messageId) {
-  // Buscar PDF, DOC o DOCX
+async function saveCvAttachment(attachments, messageId) {
   const cvAttachment = attachments.find((attachment) => {
-  const filename = (attachment.filename || '').toLowerCase();
+    const filename = (attachment.filename || '').toLowerCase();
 
-  return filename.endsWith('.pdf') ||
-         filename.endsWith('.doc') ||
-         filename.endsWith('.docx');
-});
+    return (
+      filename.endsWith('.pdf') ||
+      filename.endsWith('.doc') ||
+      filename.endsWith('.docx')
+    );
+  });
 
   if (!cvAttachment) {
     return null;
   }
 
-  // Ruta configurada en .env
-  const configuredPath =
-    process.env.CV_STORAGE_PATH || './private/cvs';
-
-  const storagePath = path.resolve(configuredPath);
-
-  // Crear carpeta automáticamente
-  fs.mkdirSync(storagePath, {
-    recursive: true,
-  });
-
   const originalName =
     cvAttachment.filename || 'cv.pdf';
 
-  // Solo permitimos estas extensiones
-  const extension =
-    path.extname(originalName).toLowerCase();
+  const extension = originalName
+    .substring(originalName.lastIndexOf('.'))
+    .toLowerCase();
 
   if (!['.pdf', '.doc', '.docx'].includes(extension)) {
     return null;
   }
 
-  // Generamos un nombre interno sin usar
-  // nombre/email del candidato
   const fileHash = crypto
     .createHash('sha256')
     .update(messageId)
     .digest('hex');
 
   const storedName = `${fileHash}${extension}`;
-
-  const filePath = path.join(
-    storagePath,
-    storedName
-  );
-
-  // Guardar archivo
-  fs.writeFileSync(
-    filePath,
-    cvAttachment.content
-  );
+  
+  const blob = await put(
+  `cvs/${storedName}`,
+  cvAttachment.content,
+  {
+    access: 'private',
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    token: process.env.BLOB_READ_WRITE_TOKEN,
+  }
+);
 
   return {
     originalName,
     storedName,
+    pathname: blob.pathname,
   };
 }
 
@@ -226,7 +214,7 @@ async function scanEmails() {
           }
 
           // Guardar CV adjunto
-const savedCv = saveCvAttachment(
+const savedCv = await saveCvAttachment(
   attachments,
   messageId
 );

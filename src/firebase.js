@@ -1,19 +1,48 @@
-const { initializeApp, cert, getApps } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
-const path = require('path');
+const {
+  initializeApp,
+  cert,
+  getApps
+} = require('firebase-admin/app');
 
-const serviceAccount = require(
-  path.join(__dirname, '../serviceAccountKey.json')
-);
+const {
+  getFirestore
+} = require('firebase-admin/firestore');
 
-// Evita inicializar Firebase más de una vez
+function getFirebaseCredential() {
+  // Producción / Vercel
+  if (
+    process.env.FIREBASE_PROJECT_ID &&
+    process.env.FIREBASE_CLIENT_EMAIL &&
+    process.env.FIREBASE_PRIVATE_KEY
+  ) {
+    return cert({
+      projectId:
+        process.env.FIREBASE_PROJECT_ID,
+
+      clientEmail:
+        process.env.FIREBASE_CLIENT_EMAIL,
+
+      privateKey:
+        process.env.FIREBASE_PRIVATE_KEY.replace(
+          /\\n/g,
+          '\n'
+        ),
+    });
+  }
+
+  // Desarrollo local
+  const serviceAccount =
+    require('../serviceAccountKey.json');
+
+  return cert(serviceAccount);
+}
+
 if (getApps().length === 0) {
   initializeApp({
-    credential: cert(serviceAccount),
+    credential: getFirebaseCredential(),
   });
 }
 
-// Conexión a Firestore
 const db = getFirestore();
 
 module.exports = {

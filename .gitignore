@@ -8,3 +8,9 @@ node_modules/
 uploads/
 
 private/
+.vercel
+
+serviceAccountKey.json
+.env
+.env.local
+.env.vercel
