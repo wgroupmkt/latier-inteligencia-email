@@ -98,10 +98,11 @@ async function scanEmails() {
     const lock = await client.getMailboxLock('INBOX');
 
     try {
-      // Buscar solamente correos NO LEÍDOS
-      const unseenMessages = await client.search({
-        seen: false,
+
+     const unseenMessages = await client.search({
+       seen: false,
       });
+
 
       console.log(
         `📨 Correos nuevos sin leer: ${unseenMessages.length}\n`
@@ -119,6 +120,35 @@ async function scanEmails() {
       })) {
         try {
           const parsed = await simpleParser(message.source);
+
+
+          // Fecha y hora desde la cual funciona la automatización
+          const automationStartDate =
+            process.env.AUTOMATION_START_DATE;
+
+          if (!automationStartDate) {
+  throw new Error(
+    'Falta configurar AUTOMATION_START_DATE'
+  );
+          }
+
+          const emailDate = parsed.date;
+          const startDate = new Date(automationStartDate);
+
+          if (Number.isNaN(startDate.getTime())) {
+  throw new Error(
+    'AUTOMATION_START_DATE tiene un formato inválido'
+  );
+            }
+
+           // Ignorar correos anteriores a la activación
+           if (emailDate && emailDate < startDate) {
+             console.log(
+               `⏭️ Correo anterior a la activación: ${emailDate}`
+             );
+
+             continue;
+           }
   
           // ID único del correo
           const messageId =
