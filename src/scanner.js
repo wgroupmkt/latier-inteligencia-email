@@ -305,4 +305,12 @@ if (savedCv) {
   }
 }
 
-scanEmails();
+module.exports = {
+  scanEmails
+};
+
+// Permite ejecutarlo manualmente:
+// node src/scanner.js
+if (require.main === module) {
+  scanEmails();
+}
