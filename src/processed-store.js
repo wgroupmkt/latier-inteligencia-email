@@ -29,7 +29,9 @@ async function markAsProcessed({
   name,
   email,
   subject,
-  attachmentName
+  attachmentName,
+  cvStoredName,
+  cvStored
 }) {
   try {
     await db.collection(COLLECTION).add({
@@ -38,6 +40,10 @@ async function markAsProcessed({
       email,
       subject,
       attachmentName: attachmentName || '',
+
+      // Archivo del CV
+      cvStoredName: cvStoredName || '',
+      cvStored: cvStored || false,
 
       detectedAsCv: true,
 

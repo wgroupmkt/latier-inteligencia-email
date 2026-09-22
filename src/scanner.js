@@ -2,6 +2,10 @@ require('dotenv').config();
 
 const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+
 const { isCvEmail } = require('./cv-detector');
 const { sendCvConfirmation } = require('./email-sender');
 
@@ -9,6 +13,68 @@ const {
   isProcessed,
   markAsProcessed
 } = require('./processed-store');
+
+function saveCvAttachment(attachments, messageId) {
+  // Buscar PDF, DOC o DOCX
+  const cvAttachment = attachments.find((attachment) => {
+  const filename = (attachment.filename || '').toLowerCase();
+
+  return filename.endsWith('.pdf') ||
+         filename.endsWith('.doc') ||
+         filename.endsWith('.docx');
+});
+
+  if (!cvAttachment) {
+    return null;
+  }
+
+  // Ruta configurada en .env
+  const configuredPath =
+    process.env.CV_STORAGE_PATH || './private/cvs';
+
+  const storagePath = path.resolve(configuredPath);
+
+  // Crear carpeta automáticamente
+  fs.mkdirSync(storagePath, {
+    recursive: true,
+  });
+
+  const originalName =
+    cvAttachment.filename || 'cv.pdf';
+
+  // Solo permitimos estas extensiones
+  const extension =
+    path.extname(originalName).toLowerCase();
+
+  if (!['.pdf', '.doc', '.docx'].includes(extension)) {
+    return null;
+  }
+
+  // Generamos un nombre interno sin usar
+  // nombre/email del candidato
+  const fileHash = crypto
+    .createHash('sha256')
+    .update(messageId)
+    .digest('hex');
+
+  const storedName = `${fileHash}${extension}`;
+
+  const filePath = path.join(
+    storagePath,
+    storedName
+  );
+
+  // Guardar archivo
+  fs.writeFileSync(
+    filePath,
+    cvAttachment.content
+  );
+
+  return {
+    originalName,
+    storedName,
+  };
+}
 
 async function scanEmails() {
   const client = new ImapFlow({
@@ -129,6 +195,22 @@ async function scanEmails() {
             continue;
           }
 
+          // Guardar CV adjunto
+const savedCv = saveCvAttachment(
+  attachments,
+  messageId
+);
+
+if (savedCv) {
+  console.log(
+    `💾 CV guardado: ${savedCv.storedName}`
+  );
+} else {
+  console.log(
+    '⚠️ Postulación detectada sin PDF/DOC/DOCX.'
+  );
+}
+
           console.log(`📤 Enviando confirmación a ${email}...`);
 
           // Enviar respuesta automática
@@ -140,14 +222,19 @@ async function scanEmails() {
 
 
           await markAsProcessed({
-          messageId,
-          name: from,
-          email,
-          subject,
-          attachmentName:
-            attachments.length > 0
-              ? attachments[0].filename
-              : ''
+            messageId,
+            name: from,
+            email,
+            subject,
+
+            attachmentName:
+              savedCv?.originalName || '',
+
+            cvStoredName:
+              savedCv?.storedName || '',
+
+            cvStored:
+              !!savedCv
           });
 
           console.log('🔥 Registro guardado en Firestore');

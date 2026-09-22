@@ -6,3 +6,5 @@ processed.json
 serviceAccountKey.json
 node_modules/
 uploads/
+
+private/
