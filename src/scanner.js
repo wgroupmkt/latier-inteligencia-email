@@ -151,15 +151,17 @@ async function scanEmails() {
         `📨 Correos candidatos: ${unseenMessages.length}`
       );
 
+      // Vercel no debe procesar demasiados correos
+      // dentro de una misma ejecución.
+      const MAX_EMAILS_PER_RUN = 3;
 
-      if (unseenMessages.length === 0) {
-        console.log(
-          '✅ No hay correos nuevos para analizar.'
-        );
+       const messagesToProcess =
+         unseenMessages
+           .slice(-MAX_EMAILS_PER_RUN);
 
-        return;
-      }
-
+       console.log(
+         `⚙️ Procesando ${messagesToProcess.length} de ${unseenMessages.length} correos candidatos`
+       );
 
       console.log(
         '3️⃣ Comenzando procesamiento...'
@@ -167,15 +169,15 @@ async function scanEmails() {
 
 
       for await (
-        const message of client.fetch(
-          unseenMessages,
-          {
-            envelope: true,
-            source: true,
-            uid: true,
-          }
-        )
-      ) {
+    const message of client.fetch(
+     messagesToProcess,
+     {
+      envelope: true,
+      source: true,
+      uid: true,
+     }
+      )
+    ) {
         try {
           console.log(
             `🔎 Analizando UID ${message.uid}...`
@@ -312,13 +314,24 @@ async function scanEmails() {
 
           // No es CV
           if (!isCv) {
-            console.log(
-              '⏭️ No se envía respuesta.'
-            );
+          console.log(
+         '⏭️ No es una postulación. No se envía respuesta.'
+          );
 
-            continue;
+                await client.messageFlagsAdd(
+           message.uid,
+           ['\\Seen'],
+           {
+             uid: true
+           }
+         );
+
+         console.log(
+           '📬 Correo no-CV marcado como leído'
+         );
+
+          continue;
           }
-
 
           // No tenemos remitente
           if (!email) {
