@@ -1,28 +1,41 @@
-require('dotenv').config();
-
-const {
-  testImapConnection
-} = require('../src/email-reader');
+const { scanEmails } = require('../src/scanner');
 
 module.exports = async function handler(req, res) {
+  const start = Date.now();
+
   try {
-    console.log('📬 Probando conexión IMAP...');
+    console.log('🚀 Iniciando scanEmails desde Vercel...');
 
-    await testImapConnection();
+    await scanEmails();
 
-    console.log('✅ IMAP conectado correctamente');
+    const seconds = (
+      (Date.now() - start) / 1000
+    ).toFixed(2);
+
+    console.log(
+      `✅ Scanner terminado en ${seconds}s`
+    );
 
     return res.status(200).json({
       success: true,
-      message: 'Conexión IMAP correcta'
+      message: 'Scanner ejecutado correctamente',
+      duration: `${seconds}s`
     });
 
   } catch (error) {
-    console.error('❌ Error IMAP:', error);
+    const seconds = (
+      (Date.now() - start) / 1000
+    ).toFixed(2);
+
+    console.error(
+      `❌ Scanner falló después de ${seconds}s:`,
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
+      duration: `${seconds}s`
     });
   }
 };
