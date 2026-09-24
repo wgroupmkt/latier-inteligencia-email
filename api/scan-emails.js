@@ -3,8 +3,23 @@ const { scanEmails } = require('../src/scanner');
 module.exports = async function handler(req, res) {
   const start = Date.now();
 
+  // Seguridad
+  const authHeader = req.headers.authorization;
+
+  if (
+    !process.env.CRON_SECRET ||
+    authHeader !== `Bearer ${process.env.CRON_SECRET}`
+  ) {
+    return res.status(401).json({
+      success: false,
+      error: 'Unauthorized'
+    });
+  }
+
   try {
-    console.log('🚀 Iniciando scanEmails desde Vercel...');
+    console.log(
+      '🚀 Iniciando scanEmails desde Vercel...'
+    );
 
     await scanEmails();
 
@@ -18,7 +33,8 @@ module.exports = async function handler(req, res) {
 
     return res.status(200).json({
       success: true,
-      message: 'Scanner ejecutado correctamente',
+      message:
+        'Scanner ejecutado correctamente',
       duration: `${seconds}s`
     });
 
