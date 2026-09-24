@@ -469,19 +469,21 @@ async function scanEmails() {
     // sepa que la ejecución falló.
     throw error;
 
-  } finally {
-  console.log(
-    '🔌 Cerrando conexión IMAP...'
-  );
+   } finally {
+    console.log(
+      '🔌 Cerrando conexión IMAP...'
+    );
 
-  if (client.usable) {
-    client.close();
+    if (client.usable) {
+      client.close();
+    }
+
+    console.log(
+      '✅ Conexión IMAP cerrada'
+    );
   }
+} // ← ESTA cierra scanEmails()
 
-  console.log(
-    '✅ Conexión IMAP cerrada'
-  );
-}
 
 module.exports = {
   scanEmails
@@ -489,9 +491,8 @@ module.exports = {
 
 
 // Permite seguir ejecutando:
-//
 // node src/scanner.js
-//
+
 if (require.main === module) {
   scanEmails().catch((error) => {
     console.error(
