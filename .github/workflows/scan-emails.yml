@@ -1,6 +1,10 @@
 name: Scan Lantier Emails
 
 on:
+  push:
+    branches:
+      - master
+
   schedule:
     - cron: "2-59/5 * * * *"
 
