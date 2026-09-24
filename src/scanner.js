@@ -430,18 +430,10 @@ async function scanEmails() {
            * todo correctamente marcamos
            * el email como leído.
            */
-          await client.messageFlagsAdd(
-            message.uid,
-            ['\\Seen'],
-            {
-              uid: true
-            }
-          );
-
-
-          console.log(
-            '📬 Correo marcado como procesado'
-          );
+         
+        console.log(
+          '✅ Correo procesado correctamente'
+         );  
 
         } catch (error) {
           console.error(
