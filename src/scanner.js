@@ -151,6 +151,14 @@ async function scanEmails() {
         `📨 Correos candidatos: ${unseenMessages.length}`
       );
 
+      if (unseenMessages.length === 0) {
+      console.log(
+         '✅ No hay correos nuevos para analizar.'
+        );
+
+         return;
+     }
+
       // Vercel no debe procesar demasiados correos
       // dentro de una misma ejecución.
       const MAX_EMAILS_PER_RUN = 3;
@@ -462,16 +470,18 @@ async function scanEmails() {
     throw error;
 
   } finally {
-    if (client.usable) {
-      console.log(
-        '🔌 Cerrando conexión IMAP...'
-      );
+  console.log(
+    '🔌 Cerrando conexión IMAP...'
+  );
 
-      await client.logout();
-    }
+  if (client.usable) {
+    client.close();
   }
-}
 
+  console.log(
+    '✅ Conexión IMAP cerrada'
+  );
+}
 
 module.exports = {
   scanEmails
