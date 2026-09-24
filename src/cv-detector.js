@@ -20,32 +20,47 @@ const KEYWORDS = [
   'analista'
 ];
 
-function isCvEmail({ subject = '', text = '', attachments = [] }) {
+function isCvEmail({
+  subject = '',
+  text = '',
+  attachments = []
+}) {
+  const normalizedSubject =
+    subject.toLowerCase().trim();
 
-  const content = `${subject} ${text}`.toLowerCase();
+  // Evitar que una respuesta a nuestra confirmación
+  // sea detectada nuevamente como una postulación.
+  if (
+    normalizedSubject.includes(
+      'hemos recibido tu cv - lantier business group'
+    )
+  ) {
+    return false;
+  }
 
-  // ¿El asunto o mensaje contiene palabras relacionadas
-  // con una postulación?
-  const keywordMatch = KEYWORDS.some((word) =>
-    content.includes(word)
-  );
+  const content =
+    `${subject} ${text}`.toLowerCase();
 
-  // ¿Tiene un documento que podría ser un CV?
-  const documentAttachment = attachments.some((attachment) => {
+  const keywordMatch =
+    KEYWORDS.some((word) =>
+      content.includes(word)
+    );
 
-    const filename = (attachment.filename || '').toLowerCase();
+  const documentAttachment =
+    attachments.some((attachment) => {
+      const filename = (
+        attachment.filename || ''
+      ).toLowerCase();
 
-    return /\.(pdf|doc|docx)$/.test(filename);
+      return /\.(pdf|doc|docx)$/.test(
+        filename
+      );
+    });
 
-  });
-
-  // Si dice claramente CV/postulación, lo consideramos CV.
   if (keywordMatch) {
     return true;
   }
 
-  // Si solamente tiene un documento pero no hay ninguna
-  // referencia laboral, todavía NO respondemos automáticamente.
   if (documentAttachment) {
     return false;
   }
@@ -53,4 +68,6 @@ function isCvEmail({ subject = '', text = '', attachments = [] }) {
   return false;
 }
 
-module.exports = { isCvEmail };
+module.exports = {
+  isCvEmail
+};
