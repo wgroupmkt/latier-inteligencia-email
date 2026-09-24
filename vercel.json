@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/scan-emails.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   }
 }
