@@ -13,16 +13,24 @@ const {
   markAsProcessed
 } = require('./processed-store');
 
-async function saveCvAttachment(attachments, messageId) {
-  const cvAttachment = attachments.find((attachment) => {
-    const filename = (attachment.filename || '').toLowerCase();
 
-    return (
-      filename.endsWith('.pdf') ||
-      filename.endsWith('.doc') ||
-      filename.endsWith('.docx')
-    );
-  });
+async function saveCvAttachment(
+  attachments,
+  messageId
+) {
+  const cvAttachment = attachments.find(
+    (attachment) => {
+      const filename = (
+        attachment.filename || ''
+      ).toLowerCase();
+
+      return (
+        filename.endsWith('.pdf') ||
+        filename.endsWith('.doc') ||
+        filename.endsWith('.docx')
+      );
+    }
+  );
 
   if (!cvAttachment) {
     return null;
@@ -35,7 +43,9 @@ async function saveCvAttachment(attachments, messageId) {
     .substring(originalName.lastIndexOf('.'))
     .toLowerCase();
 
-  if (!['.pdf', '.doc', '.docx'].includes(extension)) {
+  if (
+    !['.pdf', '.doc', '.docx'].includes(extension)
+  ) {
     return null;
   }
 
@@ -44,18 +54,22 @@ async function saveCvAttachment(attachments, messageId) {
     .update(messageId)
     .digest('hex');
 
-  const storedName = `${fileHash}${extension}`;
-  
+  const storedName =
+    `${fileHash}${extension}`;
+
+  console.log('☁️ Guardando CV en Vercel Blob...');
+
   const blob = await put(
-  `cvs/${storedName}`,
-  cvAttachment.content,
-  {
-    access: 'private',
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    token: process.env.BLOB_READ_WRITE_TOKEN,
-  }
-);
+    `cvs/${storedName}`,
+    cvAttachment.content,
+    {
+      access: 'private',
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      token:
+        process.env.BLOB_READ_WRITE_TOKEN,
+    }
+  );
 
   return {
     originalName,
@@ -64,84 +78,143 @@ async function saveCvAttachment(attachments, messageId) {
   };
 }
 
+
 async function scanEmails() {
+  const automationStartDate =
+    process.env.AUTOMATION_START_DATE;
+
+  if (!automationStartDate) {
+    throw new Error(
+      'Falta configurar AUTOMATION_START_DATE'
+    );
+  }
+
+  const startDate =
+    new Date(automationStartDate);
+
+  if (Number.isNaN(startDate.getTime())) {
+    throw new Error(
+      'AUTOMATION_START_DATE tiene un formato inválido'
+    );
+  }
+
   const client = new ImapFlow({
     host: process.env.IMAP_HOST,
-    port: Number(process.env.IMAP_PORT || 993),
+    port: Number(
+      process.env.IMAP_PORT || 993
+    ),
     secure: true,
+
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD,
     },
+
     logger: false,
   });
 
+
   try {
-    console.log('📡 Conectando al correo...');
+    console.log('1️⃣ Conectando al correo...');
 
     await client.connect();
 
-    console.log('✅ Conectado');
+    console.log('✅ IMAP conectado');
 
-    const lock = await client.getMailboxLock('INBOX');
+
+    const lock =
+      await client.getMailboxLock('INBOX');
 
     try {
+      console.log(
+        '2️⃣ Buscando correos nuevos...'
+      );
 
-     const unseenMessages = await client.search({
-       seen: false,
-      });
+      /*
+       * IMAP filtra primero por:
+       *
+       * - correo NO leído
+       * - recibido desde la fecha
+       *   de activación
+       *
+       * Esto evita descargar todo
+       * el historial.
+       */
+      const unseenMessages =
+        await client.search({
+          seen: false,
+          since: startDate,
+        });
 
 
       console.log(
-        `📨 Correos nuevos sin leer: ${unseenMessages.length}\n`
+        `📨 Correos candidatos: ${unseenMessages.length}`
       );
 
+
       if (unseenMessages.length === 0) {
-        console.log('✅ No hay correos nuevos para analizar.');
+        console.log(
+          '✅ No hay correos nuevos para analizar.'
+        );
+
         return;
       }
 
-      for await (const message of client.fetch(unseenMessages, {
-        envelope: true,
-        source: true,
-        uid: true,
-      })) {
+
+      console.log(
+        '3️⃣ Comenzando procesamiento...'
+      );
+
+
+      for await (
+        const message of client.fetch(
+          unseenMessages,
+          {
+            envelope: true,
+            source: true,
+            uid: true,
+          }
+        )
+      ) {
         try {
-          const parsed = await simpleParser(message.source);
+          console.log(
+            `🔎 Analizando UID ${message.uid}...`
+          );
 
 
-          // Fecha y hora desde la cual funciona la automatización
-          const automationStartDate =
-            process.env.AUTOMATION_START_DATE;
+          const parsed =
+            await simpleParser(
+              message.source
+            );
 
-          if (!automationStartDate) {
-  throw new Error(
-    'Falta configurar AUTOMATION_START_DATE'
-  );
+
+          /*
+           * IMAP "since" trabaja principalmente
+           * a nivel de fecha.
+           *
+           * Conservamos esta comparación para
+           * respetar también la HORA exacta
+           * configurada.
+           */
+          const emailDate =
+            parsed.date;
+
+
+          if (
+            emailDate &&
+            emailDate < startDate
+          ) {
+            console.log(
+              `⏭️ Correo anterior a la activación: ${emailDate}`
+            );
+
+            continue;
           }
 
-          const emailDate = parsed.date;
-          const startDate = new Date(automationStartDate);
 
-          if (Number.isNaN(startDate.getTime())) {
-  throw new Error(
-    'AUTOMATION_START_DATE tiene un formato inválido'
-  );
-            }
-
-           // Ignorar correos anteriores a la activación
-           if (emailDate && emailDate < startDate) {
-             console.log(
-               `⏭️ Correo anterior a la activación: ${emailDate}`
-             );
-
-             continue;
-           }
-  
-          // ID único del correo
           const messageId =
-                parsed.messageId ||
-                    `uid-${message.uid}`;
+            parsed.messageId ||
+            `uid-${message.uid}`;
 
 
           const from =
@@ -149,100 +222,170 @@ async function scanEmails() {
             parsed.from?.value?.[0]?.address ||
             'Desconocido';
 
+
           const email =
             parsed.from?.value?.[0]?.address ||
             null;
+
 
           const subject =
             parsed.subject ||
             '(Sin asunto)';
 
+
           const text =
-            parsed.text ||
-            '';
+            parsed.text || '';
+
 
           const attachments =
             parsed.attachments || [];
 
 
-            // Verificar si este correo ya fue procesado
-          if (await isProcessed(messageId)) {
-            console.log('⏭️ Este correo ya fue respondido anteriormente.');
-            console.log('');
+          console.log(
+            '🔍 Verificando duplicado...'
+          );
+
+
+          if (
+            await isProcessed(messageId)
+          ) {
+            console.log(
+              '⏭️ Este correo ya fue procesado anteriormente.'
+            );
+
             continue;
           }
 
-          const isCv = isCvEmail({
-            subject,
-            text,
-            attachments,
-          });
 
-          console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-          console.log(`📩 De: ${from}`);
-          console.log(`📧 Email: ${email || 'Sin email'}`);
-          console.log(`📌 Asunto: ${subject}`);
+          const isCv =
+            isCvEmail({
+              subject,
+              text,
+              attachments,
+            });
 
-          if (attachments.length > 0) {
-            console.log(
-              `📎 Adjuntos: ${attachments
-                .map((a) => a.filename || 'archivo')
-                .join(', ')}`
-            );
-          } else {
-            console.log('📎 Adjuntos: ninguno');
-          }
 
           console.log(
-            `🤖 ¿Parece una postulación?: ${
-              isCv ? '✅ SÍ' : '❌ NO'
+            '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+          );
+
+          console.log(`📩 De: ${from}`);
+
+          console.log(
+            `📧 Email: ${
+              email || 'Sin email'
             }`
           );
 
-          // Si NO es CV, no respondemos
+          console.log(
+            `📌 Asunto: ${subject}`
+          );
+
+
+          if (attachments.length > 0) {
+            console.log(
+              `📎 Adjuntos: ${
+                attachments
+                  .map(
+                    (a) =>
+                      a.filename ||
+                      'archivo'
+                  )
+                  .join(', ')
+              }`
+            );
+          } else {
+            console.log(
+              '📎 Adjuntos: ninguno'
+            );
+          }
+
+
+          console.log(
+            `🤖 ¿Parece una postulación?: ${
+              isCv
+                ? '✅ SÍ'
+                : '❌ NO'
+            }`
+          );
+
+
+          // No es CV
           if (!isCv) {
-            console.log('⏭️ No se envía respuesta.\n');
+            console.log(
+              '⏭️ No se envía respuesta.'
+            );
+
             continue;
           }
 
-          // Seguridad: necesitamos email del remitente
+
+          // No tenemos remitente
           if (!email) {
             console.log(
-              '⚠️ No se encontró email del remitente. No se responde.\n'
+              '⚠️ No se encontró email del remitente.'
             );
+
             continue;
           }
 
-          // Guardar CV adjunto
-const savedCv = await saveCvAttachment(
-  attachments,
-  messageId
-);
 
-if (savedCv) {
-  console.log(
-    `💾 CV guardado: ${savedCv.storedName}`
-  );
-} else {
-  console.log(
-    '⚠️ Postulación detectada sin PDF/DOC/DOCX.'
-  );
-}
+          /*
+           * Guardar CV en
+           * Vercel Private Blob
+           */
+          const savedCv =
+            await saveCvAttachment(
+              attachments,
+              messageId
+            );
 
-          console.log(`📤 Enviando confirmación a ${email}...`);
 
-          // Enviar respuesta automática
+          if (savedCv) {
+            console.log(
+              `💾 CV guardado: ${savedCv.storedName}`
+            );
+          } else {
+            console.log(
+              '⚠️ Postulación sin PDF/DOC/DOCX.'
+            );
+          }
+
+
+          /*
+           * Enviar confirmación
+           */
+          console.log(
+            `📤 Enviando confirmación a ${email}...`
+          );
+
+
           await sendCvConfirmation({
             to: email,
           });
 
-          console.log('✅ Confirmación enviada correctamente');
+
+          console.log(
+            '✅ Confirmación enviada'
+          );
+
+
+          /*
+           * Guardar candidato
+           * en Firestore
+           */
+          console.log(
+            '🔥 Guardando candidato en Firestore...'
+          );
 
 
           await markAsProcessed({
             messageId,
+
             name: from,
+
             email,
+
             subject,
 
             attachmentName:
@@ -255,17 +398,29 @@ if (savedCv) {
               !!savedCv
           });
 
-          console.log('🔥 Registro guardado en Firestore');
 
-          // Marcar como leído SOLO después de enviar correctamente
+          console.log(
+            '🔥 Registro guardado en Firestore'
+          );
+
+
+          /*
+           * Solo después de completar
+           * todo correctamente marcamos
+           * el email como leído.
+           */
           await client.messageFlagsAdd(
             message.uid,
             ['\\Seen'],
-            { uid: true }
+            {
+              uid: true
+            }
           );
 
-          console.log('📬 Correo marcado como procesado');
-          console.log('');
+
+          console.log(
+            '📬 Correo marcado como procesado'
+          );
 
         } catch (error) {
           console.error(
@@ -274,7 +429,7 @@ if (savedCv) {
           );
 
           console.log(
-            '⚠️ No se marca como procesado para poder reintentarlo.\n'
+            '⚠️ Se deja sin procesar para reintentarlo.'
           );
         }
       }
@@ -284,21 +439,43 @@ if (savedCv) {
     }
 
   } catch (error) {
-    console.error('❌ Error general:', error.message);
+    console.error(
+      '❌ Error general:',
+      error.message
+    );
+
+    // Importante para que Vercel
+    // sepa que la ejecución falló.
+    throw error;
 
   } finally {
     if (client.usable) {
+      console.log(
+        '🔌 Cerrando conexión IMAP...'
+      );
+
       await client.logout();
     }
   }
 }
 
+
 module.exports = {
   scanEmails
 };
 
-// Permite ejecutarlo manualmente:
+
+// Permite seguir ejecutando:
+//
 // node src/scanner.js
+//
 if (require.main === module) {
-  scanEmails();
+  scanEmails().catch((error) => {
+    console.error(
+      '❌ Scanner finalizado con error:',
+      error.message
+    );
+
+    process.exitCode = 1;
+  });
 }
